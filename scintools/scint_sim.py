@@ -172,6 +172,8 @@ class Simulation():
             w[self.nx+1-kp, self.ny+1-il] = w[kp-1, il-1]
             w[self.nx+1-k, self.ny+1-il] = w[k-1, il-1]
 
+        self.w = w
+
         # done the whole screen weights, now generate complex gaussian array
         xyp = np.multiply(w, np.add(randn(self.nx, self.ny),
                                     1j*randn(self.nx, self.ny)))
