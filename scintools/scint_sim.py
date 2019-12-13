@@ -151,6 +151,13 @@ class Simulation():
         ny2 = int(self.ny/2 + 1)
 
         w = np.zeros([self.nx, self.ny])  # initialize array
+        w_dx = np.zeros_like(w, dtype=np.complex128)
+        w_dy = np.zeros_like(w, dtype=np.complex128)
+        w_dx2 = np.zeros_like(w, dtype=np.complex128)
+        w_dy2 = np.zeros_like(w, dtype=np.complex128)
+        w_dxdy = np.zeros_like(w, dtype=np.complex128)
+        w_lap = np.zeros_like(w, dtype=np.complex128)
+
         dqx = 2*np.pi/(self.dx*self.nx)
         dqy = 2*np.pi/(self.dy*self.ny)
 
@@ -172,14 +179,76 @@ class Simulation():
             w[self.nx+1-kp, self.ny+1-il] = w[kp-1, il-1]
             w[self.nx+1-k, self.ny+1-il] = w[k-1, il-1]
 
-        self.w = w
+
+        # first do ky=0 line
+        k = np.arange(2, nx2+1)
+        w_dx[k-1, 0], w_dy[k-1, 0], w_lap[k-1, 0] = self.swdsp_d(kx=(k-1)*dqx, ky=0, dx=True), self.swdsp_d(kx=(k-1)*dqx, ky=0, dy=True), self.swdsp_d(kx=(k-1)*dqx, ky=0, laplacian=True)
+        w_dx2[k-1, 0], w_dy2[k-1, 0], w_dxdy[k-1, 0] = self.swdsp_d(kx=(k-1)*dqx, ky=0, dx2=True), self.swdsp_d(kx=(k-1)*dqx, ky=0, dy2=True), self.swdsp_d(kx=(k-1)*dqx, ky=0, dxdy=True)
+        w_dx[self.nx+1-k, 0] = w_dx[k, 0]
+        w_dy[self.nx+1-k, 0] = w_dy[k, 0]
+        w_lap[self.nx+1-k, 0] = w_lap[k, 0]
+        w_dx2[self.nx+1-k, 0] = w_dx2[k, 0]
+        w_dy2[self.nx+1-k, 0] = w_dy2[k, 0]
+        w_dxdy[self.nx+1-k, 0] = w_dxdy[k, 0]
+
+        # then do kx=0 line
+        ll = np.arange(2, ny2+1)
+        w[0, ll-1] = self.swdsp(kx=0, ky=(ll-1)*dqy)
+        w_dx[0, ll-1], w_dy[0, ll-1], w_lap[0, ll-1] = self.swdsp_d(kx=0, ky=(ll-1)*dqy, dx=True), self.swdsp_d(kx=0, ky=(ll-1)*dqy, dy=True), self.swdsp_d(kx=0, ky=(ll-1)*dqy, laplacian=True)
+        w_dx2[0, ll-1], w_dy2[0, ll-1], w_dxdy[0, ll-1] = self.swdsp_d(kx=0, ky=(ll-1)*dqy, dx2=True), self.swdsp_d(kx=0, ky=(ll-1)*dqy, dy2=True), self.swdsp_d(kx=0, ky=(ll-1)*dqy, dxdy=True)
+        w_dx[0, self.ny+1-ll] = w_dx[0, ll-1]
+        w_dy[0, self.ny+1-ll] = w_dy[0, ll-1]
+        w_lap[0, self.ny+1-ll] = w_lap[0, ll-1]
+        w_dx2[0, self.ny+1-ll] = w_dx2[0, ll-1]
+        w_dy2[0, self.ny+1-ll] = w_dy2[0, ll-1]
+        w_dxdy[0, self.ny+1-ll] = w_dxdy[0, ll-1]
+        # now do the rest of the field
+        kp = np.arange(2, nx2+1)
+        k = np.arange((nx2+1), self.nx+1)
+        km = -(self.nx-k+1)
+        for il in range(2, ny2+1):
+            w_dx[kp-1, il-1] = self.swdsp_d(kx=(kp-1)*dqx, ky=(il-1)*dqy, dx=True)
+            w_dx[k-1, il-1] = self.swdsp_d(kx=km*dqx, ky=(il-1)*dqy, dx=True)
+            w_dx[self.nx+1-kp, self.ny+1-il] = w_dx[kp-1, il-1]
+            w_dx[self.nx+1-k, self.ny+1-il] = w_dx[k-1, il-1]
+            w_dy[kp-1, il-1] = self.swdsp_d(kx=(kp-1)*dqx, ky=(il-1)*dqy, dy=True)
+            w_dy[k-1, il-1] = self.swdsp_d(kx=km*dqx, ky=(il-1)*dqy, dy=True)
+            w_dy[self.nx+1-kp, self.ny+1-il] = w_dy[kp-1, il-1]
+            w_dy[self.nx+1-k, self.ny+1-il] = w_dy[k-1, il-1]
+            w_lap[kp-1, il-1] = self.swdsp_d(kx=(kp-1)*dqx, ky=(il-1)*dqy, laplacian=True)
+            w_lap[k-1, il-1] = self.swdsp_d(kx=km*dqx, ky=(il-1)*dqy, laplacian=True)
+            w_lap[self.nx+1-kp, self.ny+1-il] = w_lap[kp-1, il-1]
+            w_lap[self.nx+1-k, self.ny+1-il] = w_lap[k-1, il-1]
+            w_dx2[kp-1, il-1] = self.swdsp_d(kx=(kp-1)*dqx, ky=(il-1)*dqy, dx2=True)
+            w_dx2[k-1, il-1] = self.swdsp_d(kx=km*dqx, ky=(il-1)*dqy, dx2=True)
+            w_dx2[self.nx+1-kp, self.ny+1-il] = w_dx[kp-1, il-1]
+            w_dx2[self.nx+1-k, self.ny+1-il] = w_dx[k-1, il-1]
+            w_dy2[kp-1, il-1] = self.swdsp_d(kx=(kp-1)*dqx, ky=(il-1)*dqy, dy2=True)
+            w_dy2[k-1, il-1] = self.swdsp_d(kx=km*dqx, ky=(il-1)*dqy, dy2=True)
+            w_dy2[self.nx+1-kp, self.ny+1-il] = w_dy[kp-1, il-1]
+            w_dy2[self.nx+1-k, self.ny+1-il] = w_dy[k-1, il-1]
+            w_dxdy[kp-1, il-1] = self.swdsp_d(kx=(kp-1)*dqx, ky=(il-1)*dqy, dxdy=True)
+            w_dxdy[k-1, il-1] = self.swdsp_d(kx=km*dqx, ky=(il-1)*dqy, dxdy=True)
+            w_dxdy[self.nx+1-kp, self.ny+1-il] = w_lap[kp-1, il-1]
+            w_dxdy[self.nx+1-k, self.ny+1-il] = w_lap[k-1, il-1]
 
         # done the whole screen weights, now generate complex gaussian array
-        xyp = np.multiply(w, np.add(randn(self.nx, self.ny),
-                                    1j*randn(self.nx, self.ny)))
+        randm = np.add(randn(self.nx, self.ny),
+                    1j*randn(self.nx, self.ny))
+        xyp = np.multiply(w, randm)
+        xyp_dx = np.multiply(w_dx, randm)
+        xyp_dy = np.multiply(w_dy, randm)
+        xyp_lap = np.multiply(w_lap, randm)
+        xyp_dx2 = np.multiply(w_dx2, randm)
+        xyp_dy2 = np.multiply(w_dy2, randm)
+        xyp_dxdy = np.multiply(w_dxdy, randm)
 
         xyp = np.real(fft2(xyp))
+        xyp_dx, xyp_dy, xyp_lap = np.real(fft2(xyp_dx)), np.real(fft2(xyp_dy)), np.real(fft2(xyp_lap))
+        xyp_dx2, xyp_dy2, xyp_dxdy = np.real(fft2(xyp_dx2)), np.real(fft2(xyp_dy2)), np.real(fft2(xyp_dxdy))
         self.xyp = xyp
+        self.xyp_dx, self.xyp_dy, self.xyp_lap = xyp_dx, xyp_dy, xyp_lap
+        self.xyp_dx2, self.xyp_dy2, self.xyp_dxdy = xyp_dx2, xyp_dy2, xyp_dxdy
         return
 
     def get_intensity(self, verbose=True):
@@ -244,6 +313,31 @@ class Simulation():
                               np.exp(-(np.add(np.power(kx, 2),
                                               np.power(ky, 2))) *
                                      self.inner**2/2))
+        return out
+
+    def swdsp_d(self, kx=0, ky=0, dx=False, dy=False, dx2=False, dy2=False, dxdy=False, dydx=False, laplacian=False):
+        cs = np.cos(self.psi*np.pi/180)
+        sn = np.sin(self.psi*np.pi/180)
+        r = self.ar
+        con = np.sqrt(self.consp)
+        alf = -(self.alpha+2)/4
+        # anisotropy parameters
+        a = (cs**2)/r + r*sn**2
+        b = r*cs**2 + sn**2/r
+        c = 2*cs*sn*(1/r-r)
+        q2 = a * np.power(kx, 2) + b * np.power(ky, 2) + c*np.multiply(kx, ky)
+        # isotropic inner scale
+        out = con*np.multiply(np.power(q2, alf),
+                              np.exp(-(np.add(np.power(kx, 2),
+                                              np.power(ky, 2))) *
+                                     self.inner**2/2))
+        out = out.astype(np.complex128)
+        if dx:
+            out = np.multiply(1j*kx, out)
+        if dy:
+            out = np.multiply(1j*ky, out)
+        if laplacian:
+            out = np.multiply(-(kx**2 + ky**2), out)
         return out
 
     def frfilt3(self, xye, scale):
